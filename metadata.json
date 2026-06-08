@@ -1,0 +1,6 @@
+{
+  "name": "Vidyalay Offline",
+  "description": "E-Learning app tailored for Punjab Board enabling offline study with achievements, bento progress, micro-lessons, and smart adaptive quizzes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
