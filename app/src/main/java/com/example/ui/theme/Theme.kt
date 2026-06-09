@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
@@ -25,7 +26,7 @@ private val LightColorScheme = lightColorScheme(
     tertiary = GoldAccent,
     background = BackgroundColor,
     surface = SurfaceContainerLow,
-    onPrimary = OnBackground,
+    onPrimary = Color.White,
     onSecondary = OnBackground,
     onBackground = OnBackground,
     onSurface = OnBackground,
@@ -38,14 +39,9 @@ fun MyApplicationTheme(
     dynamicColor: Boolean = false, // Set to false to strictly enforce our premium glassmorphic educational branding!
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+    // Force LightColorScheme under both dark and light mode settings because the app's visual identity,
+    // layout containers, and text definitions are custom designed with high-contrast light emerald white/mints.
+    val colorScheme = LightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,

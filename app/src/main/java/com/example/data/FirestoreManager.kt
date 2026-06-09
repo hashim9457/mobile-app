@@ -28,19 +28,24 @@ object FirestoreManager {
         }
 
         return try {
-            val querySnapshot = suspendCancellableCoroutine { continuation ->
-                fs.collection("subjects")
-                    .whereEqualTo("classLevel", classLevel)
-                    .get()
-                    .addOnSuccessListener { snapshot ->
-                        continuation.resume(snapshot)
-                    }
-                    .addOnFailureListener { exception ->
-                        continuation.resumeWithException(exception)
-                    }
+            val querySnapshot = kotlinx.coroutines.withTimeoutOrNull(1800) {
+                suspendCancellableCoroutine { continuation ->
+                    fs.collection("subjects")
+                        .whereEqualTo("classLevel", classLevel)
+                        .get()
+                        .addOnSuccessListener { snapshot ->
+                            continuation.resume(snapshot)
+                        }
+                        .addOnFailureListener { exception ->
+                            continuation.resumeWithException(exception)
+                        }
+                }
             }
 
-            if (querySnapshot.isEmpty) {
+            if (querySnapshot == null) {
+                Log.d("FirestoreManager", "Firestore fetch timed out for Class $classLevel. Using fallback local subjects.")
+                getLocalFallbackSubjects(classLevel)
+            } else if (querySnapshot.isEmpty) {
                 Log.d("FirestoreManager", "Firestore querySnapshot is empty. Auto-seeding default subjects to cloud.")
                 seedDefaultSubjectsToFirestore(classLevel)
                 getLocalFallbackSubjects(classLevel)
@@ -100,19 +105,24 @@ object FirestoreManager {
         }
 
         return try {
-            val querySnapshot = suspendCancellableCoroutine { continuation ->
-                fs.collection("chapters")
-                    .whereEqualTo("subjectId", subjectId)
-                    .get()
-                    .addOnSuccessListener { snapshot ->
-                        continuation.resume(snapshot)
-                    }
-                    .addOnFailureListener { exception ->
-                        continuation.resumeWithException(exception)
-                    }
+            val querySnapshot = kotlinx.coroutines.withTimeoutOrNull(1800) {
+                suspendCancellableCoroutine { continuation ->
+                    fs.collection("chapters")
+                        .whereEqualTo("subjectId", subjectId)
+                        .get()
+                        .addOnSuccessListener { snapshot ->
+                            continuation.resume(snapshot)
+                        }
+                        .addOnFailureListener { exception ->
+                            continuation.resumeWithException(exception)
+                        }
+                }
             }
 
-            if (querySnapshot.isEmpty) {
+            if (querySnapshot == null) {
+                Log.d("FirestoreManager", "Firestore chapters fetch timed out for $subjectId. Using fallback local chapters.")
+                getLocalFallbackChapters(subjectId)
+            } else if (querySnapshot.isEmpty) {
                 Log.d("FirestoreManager", "Firestore chapters are empty. Auto-seeding default chapters.")
                 seedDefaultChaptersToFirestore(subjectId)
                 getLocalFallbackChapters(subjectId)
@@ -166,19 +176,24 @@ object FirestoreManager {
         }
 
         return try {
-            val docSnapshot = suspendCancellableCoroutine { continuation ->
-                fs.collection("notes")
-                    .document(noteId)
-                    .get()
-                    .addOnSuccessListener { snapshot ->
-                        continuation.resume(snapshot)
-                    }
-                    .addOnFailureListener { exception ->
-                        continuation.resumeWithException(exception)
-                    }
+            val docSnapshot = kotlinx.coroutines.withTimeoutOrNull(1800) {
+                suspendCancellableCoroutine { continuation ->
+                    fs.collection("notes")
+                        .document(noteId)
+                        .get()
+                        .addOnSuccessListener { snapshot ->
+                            continuation.resume(snapshot)
+                        }
+                        .addOnFailureListener { exception ->
+                            continuation.resumeWithException(exception)
+                        }
+                }
             }
 
-            if (!docSnapshot.exists()) {
+            if (docSnapshot == null) {
+                Log.d("FirestoreManager", "Firestore notes query timed out for $noteId. Using fallback local notes.")
+                getLocalFallbackNote(subjectId, chapterNumber, defaultTitle)
+            } else if (!docSnapshot.exists()) {
                 Log.d("FirestoreManager", "Firestore note NOT found for $noteId. Generating & Seeding cloud copy.")
                 val localNote = getLocalFallbackNote(subjectId, chapterNumber, defaultTitle)
                 val data = hashMapOf(
@@ -594,17 +609,20 @@ object FirestoreManager {
         )
 
         return try {
-            suspendCancellableCoroutine { continuation ->
-                fs.collection("quiz_attempts")
-                    .document(docId)
-                    .set(data)
-                    .addOnSuccessListener {
-                        continuation.resume(true)
-                    }
-                    .addOnFailureListener {
-                        continuation.resume(false)
-                    }
-            }
+            val success = kotlinx.coroutines.withTimeoutOrNull(2000) {
+                suspendCancellableCoroutine { continuation ->
+                    fs.collection("quiz_attempts")
+                        .document(docId)
+                        .set(data)
+                        .addOnSuccessListener {
+                            continuation.resume(true)
+                        }
+                        .addOnFailureListener {
+                            continuation.resume(false)
+                        }
+                }
+            } ?: false
+            success
         } catch (e: Exception) {
             Log.e("FirestoreManager", "Failed to save quiz attempt on Firebase.", e)
             false
@@ -632,17 +650,20 @@ object FirestoreManager {
         )
 
         return try {
-            suspendCancellableCoroutine { continuation ->
-                fs.collection("student_progress")
-                    .document(docId)
-                    .set(data)
-                    .addOnSuccessListener {
-                        continuation.resume(true)
-                    }
-                    .addOnFailureListener {
-                        continuation.resume(false)
-                    }
-            }
+            val success = kotlinx.coroutines.withTimeoutOrNull(2000) {
+                suspendCancellableCoroutine { continuation ->
+                    fs.collection("student_progress")
+                        .document(docId)
+                        .set(data)
+                        .addOnSuccessListener {
+                            continuation.resume(true)
+                        }
+                        .addOnFailureListener {
+                            continuation.resume(false)
+                        }
+                }
+            } ?: false
+            success
         } catch (e: Exception) {
             Log.e("FirestoreManager", "Failed to upload student progress to cloud firestore.", e)
             false

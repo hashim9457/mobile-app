@@ -68,8 +68,16 @@ class MainActivity : ComponentActivity() {
                 com.google.firebase.FirebaseApp.initializeApp(this, options)
                 android.util.Log.d("FirebaseInit", "Firebase manually initialized successfully.")
             }
+            
+            // PRINT FIREBASE DETAILS TO LOGS INSIDE APP ON CREATION as requested
+            val app = com.google.firebase.FirebaseApp.getInstance()
+            android.util.Log.d("FirebaseVerify", ">>>> FIREBASE PROJECT CONNECTION DETECTED <<<<")
+            android.util.Log.d("FirebaseVerify", "Firebase Project ID: ${app.options.projectId}")
+            android.util.Log.d("FirebaseVerify", "Firebase App Name: ${app.name}")
+            android.util.Log.d("FirebaseVerify", "Package Name: ${this.packageName}")
+            android.util.Log.d("FirebaseVerify", ">>>> END OF FIREBASE CONNECTION DETAILS <<<<")
         } catch (e: Exception) {
-            android.util.Log.e("FirebaseInit", "Failed manually initializing FirebaseApp", e)
+            android.util.Log.e("FirebaseInit", "Failed manually initializing or reading FirebaseApp metadata", e)
         }
         enableEdgeToEdge()
         setContent {
@@ -86,6 +94,7 @@ fun AppNavigator(viewModel: MainViewModel) {
 
     AnimatedContent(
         targetState = currentScreen,
+        modifier = Modifier.fillMaxSize(),
         transitionSpec = {
             fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
         },
@@ -96,6 +105,7 @@ fun AppNavigator(viewModel: MainViewModel) {
             is Screen.Onboarding -> OnboardingScreen(viewModel)
             is Screen.Auth -> AuthScreen(viewModel)
             is Screen.MainApp -> MainAppTabsContainer(viewModel)
+            is Screen.FirebaseDebug -> FirebaseDebugScreen(viewModel)
             is Screen.SubjectDetail -> SubjectDetailScreen(viewModel, screen.subjectId)
             is Screen.Quiz -> QuizScreen(viewModel, screen.subjectId)
             is Screen.QuizResult -> QuizResultsScreen(
@@ -120,6 +130,15 @@ fun AppNavigator(viewModel: MainViewModel) {
 // ==========================================
 @Composable
 fun SplashScreen(viewModel: MainViewModel) {
+    val profile by viewModel.profile.collectAsState()
+
+    LaunchedEffect(profile) {
+        if (profile?.isLoggedIn == true) {
+            delay(1500)
+            viewModel.navigateTo(Screen.MainApp)
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -652,7 +671,7 @@ fun HomeScreen(viewModel: MainViewModel) {
                             fontWeight = FontWeight.ExtraBold
                         )
                         Text(
-                            text = "Assalam-o-Alaikum",
+                            text = "Assalam-o-Alaikum, ${profile?.studentName ?: "Student"}",
                             color = OnSurfaceVariant,
                             fontSize = 14.sp
                         )
@@ -714,7 +733,7 @@ fun HomeScreen(viewModel: MainViewModel) {
                                 letterSpacing = 0.5.sp
                             )
                             Text(
-                                text = "Class 4 Rising Star",
+                                text = "Class ${profile?.classSelected ?: 4} Rising Star",
                                 color = Color.White,
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.ExtraBold
@@ -895,58 +914,120 @@ fun HomeScreen(viewModel: MainViewModel) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Scrollable Classes Row
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(horizontal = 4.dp)
+                // Beautiful Responsive 2-Row Grid for all 5 Classes (simultaneously visible with zero horizontal scrolling)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items((1..5).toList()) { num ->
-                        val active = num == selectedClass
-                        Box(
-                            modifier = Modifier
-                                .size(width = 84.dp, height = 96.dp)
-                                .clip(RoundedCornerShape(20.dp))
-                                .shadow(2.dp, RoundedCornerShape(20.dp))
-                                .background(
-                                    if (active) PrimaryColor else SurfaceContainerLow
-                                )
-                                .border(
-                                    1.dp,
-                                    if (active) Color.Transparent else OutlineVariant,
-                                    RoundedCornerShape(20.dp)
-                                )
-                                .clickable { viewModel.selectClass(num) }
-                                .padding(12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    imageVector = when (num) {
-                                        1 -> Icons.Outlined.ChildCare
-                                        2 -> Icons.Outlined.AutoStories
-                                        3 -> Icons.Outlined.Science
-                                        4 -> Icons.Default.Star
-                                        else -> Icons.Outlined.Architecture
-                                    },
-                                    contentDescription = null,
-                                    tint = if (active) Color.White else when (num) {
-                                        1 -> Color(0xFF006C4C)
-                                        2 -> Color(0xFFC2410C)
-                                        3 -> Color(0xFF006C4C)
-                                        4 -> GoldAccent
-                                        else -> Color(0xFFBA1A1A)
-                                    },
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Class $num",
-                                    color = if (active) Color.White else PrimaryColor,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        listOf(1, 2, 3).forEach { num ->
+                            val active = num == selectedClass
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(84.dp)
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .shadow(2.dp, RoundedCornerShape(20.dp))
+                                    .background(
+                                        if (active) PrimaryColor else SurfaceContainerLow
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (active) Color.Transparent else OutlineVariant,
+                                        RoundedCornerShape(20.dp)
+                                    )
+                                    .clickable { viewModel.selectClass(num) }
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = when (num) {
+                                            1 -> Icons.Outlined.ChildCare
+                                            2 -> Icons.Outlined.AutoStories
+                                            3 -> Icons.Outlined.Science
+                                            4 -> Icons.Default.Star
+                                            else -> Icons.Outlined.Architecture
+                                        },
+                                        contentDescription = null,
+                                        tint = if (active) Color.White else when (num) {
+                                            1 -> Color(0xFF006C4C)
+                                            2 -> Color(0xFFC2410C)
+                                            3 -> Color(0xFF006C4C)
+                                            4 -> GoldAccent
+                                            else -> Color(0xFFBA1A1A)
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Class $num",
+                                        color = if (active) Color.White else PrimaryColor,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Spacer(modifier = Modifier.weight(0.5f))
+                        listOf(4, 5).forEach { num ->
+                            val active = num == selectedClass
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(84.dp)
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .shadow(2.dp, RoundedCornerShape(20.dp))
+                                    .background(
+                                        if (active) PrimaryColor else SurfaceContainerLow
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (active) Color.Transparent else OutlineVariant,
+                                        RoundedCornerShape(20.dp)
+                                    )
+                                    .clickable { viewModel.selectClass(num) }
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = when (num) {
+                                            1 -> Icons.Outlined.ChildCare
+                                            2 -> Icons.Outlined.AutoStories
+                                            3 -> Icons.Outlined.Science
+                                            4 -> Icons.Default.Star
+                                            else -> Icons.Outlined.Architecture
+                                        },
+                                        contentDescription = null,
+                                        tint = if (active) Color.White else when (num) {
+                                            1 -> Color(0xFF006C4C)
+                                            2 -> Color(0xFFC2410C)
+                                            3 -> Color(0xFF006C4C)
+                                            4 -> GoldAccent
+                                            else -> Color(0xFFBA1A1A)
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Class $num",
+                                        color = if (active) Color.White else PrimaryColor,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.weight(0.5f))
                     }
                 }
             }
@@ -1224,214 +1305,353 @@ fun Modifier.underline(): Modifier = drawBehind {
 // 5. LESSONS TAB SCREEN
 // ==========================================
 @Composable
-fun LessonsTabScreen(viewModel: MainViewModel) {
-    val subjects by viewModel.subjects.collectAsState()
-
-    LazyColumn(
+fun LessonsScrollMonitorCard(listState: androidx.compose.foundation.lazy.LazyListState, subjectsSize: Int) {
+    val firstIdx by remember { derivedStateOf { listState.firstVisibleItemIndex } }
+    val firstOffset by remember { derivedStateOf { listState.firstVisibleItemScrollOffset } }
+    
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundColor)
-            .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp)
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .testTag("lessons_debug_card"),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
     ) {
-        item {
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(
-                text = "Your Journey Today",
-                color = PrimaryColor,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold
+                text = "🔍 SCROLLING & DATA MONITOR",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Step into the future of learning. Every subject is a new pathway to leadership. Complete your lessons to secure golden badges.",
-                color = OnSurfaceVariant,
-                fontSize = 14.sp,
-                lineHeight = 20.sp
+                text = "Subjects Count: $subjectsSize (English, Urdu, Islamiyat, General Knowledge, Mathematics)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text = "Scroll position: Item index $firstIdx • Offset $firstOffset px",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "Scroll Controls: Use the scrollbar on the right, mouse wheel drag, or the Floating Buttons to scroll instantly.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
+    }
+}
 
-        // Subjects micro-lessons grid
-        items(subjects) { subject ->
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceContainerLow),
-                border = BorderStroke(1.dp, OutlineVariant),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 10.dp)
-                    .shadow(4.dp, RoundedCornerShape(24.dp))
-                    .clickable {
-                        viewModel.setSubjectId(subject.id)
-                        viewModel.navigateTo(Screen.SubjectDetail(subject.id))
-                    }
-            ) {
-                Column {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(130.dp)
-                    ) {
-                        AsyncImage(
-                            model = subject.imageUrl,
-                            contentDescription = subject.title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
+@Composable
+fun BoxScope.LessonsCustomScrollbar(listState: androidx.compose.foundation.lazy.LazyListState) {
+    val totalItems by remember { derivedStateOf { listState.layoutInfo.totalItemsCount } }
+    val visibleItems by remember { derivedStateOf { listState.layoutInfo.visibleItemsInfo.size } }
+    val firstIdx by remember { derivedStateOf { listState.firstVisibleItemIndex } }
 
-                        if (subject.isOfflineReady) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(12.dp)
-                                    .clip(CircleShape)
-                                    .background(SecondaryContainer.copy(alpha = 0.9f))
-                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.OfflinePin,
-                                        contentDescription = null,
-                                        tint = OnSecondaryContainer,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Offline Ready",
-                                        color = OnSecondaryContainer,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+    if (totalItems > 0 && visibleItems < totalItems) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 6.dp, top = 80.dp, bottom = 80.dp)
+                .width(6.dp)
+                .fillMaxHeight(0.7f)
+                .background(Color.Gray.copy(alpha = 0.15f), RoundedCornerShape(3.dp))
+        ) {
+            val maxScrollableIdx = (totalItems - visibleItems).coerceAtLeast(1)
+            val scrollRatio = firstIdx.toFloat() / maxScrollableIdx.toFloat()
+            
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val maxHeightPx = maxHeight
+                val thumbHeight = 40.dp
+                val maxOffsetDp = maxHeightPx - thumbHeight
+                val thumbOffset = maxOffsetDp * scrollRatio
+
+                Box(
+                    modifier = Modifier
+                        .offset(y = thumbOffset)
+                        .width(6.dp)
+                        .height(thumbHeight)
+                        .background(PrimaryColor, RoundedCornerShape(3.dp))
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun LessonsTabScreen(viewModel: MainViewModel) {
+    val subjects by viewModel.subjects.collectAsState()
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BackgroundColor)
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp)
+        ) {
+            item {
+                LessonsScrollMonitorCard(listState = listState, subjectsSize = subjects.size)
+
+                Text(
+                    text = "Your Journey Today",
+                    color = PrimaryColor,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Step into the future of learning. Every subject is a new pathway to leadership. Complete your lessons to secure golden badges.",
+                    color = OnSurfaceVariant,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
+            // Subjects micro-lessons grid
+            items(subjects) { subject ->
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceContainerLow),
+                    border = BorderStroke(1.dp, OutlineVariant),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp)
+                        .shadow(4.dp, RoundedCornerShape(24.dp))
+                        .clickable {
+                            viewModel.setSubjectId(subject.id)
+                            viewModel.navigateTo(Screen.SubjectDetail(subject.id))
+                        }
+                ) {
+                    Column {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(130.dp)
+                        ) {
+                            AsyncImage(
+                                model = subject.imageUrl,
+                                contentDescription = subject.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+
+                            if (subject.isOfflineReady) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(12.dp)
+                                        .clip(CircleShape)
+                                        .background(SecondaryContainer.copy(alpha = 0.9f))
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.OfflinePin,
+                                            contentDescription = null,
+                                            tint = OnSecondaryContainer,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Offline Ready",
+                                            color = OnSecondaryContainer,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    // Content text
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = subject.category.uppercase(),
-                                color = OnSurfaceVariant.copy(alpha = 0.6f),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = subject.title,
-                                color = PrimaryColor,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Horizontal progress slider
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Content text
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Progress: ",
-                                    color = OnSurfaceVariant,
-                                    fontSize = 12.sp
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "${subject.progress}%",
-                                    color = PrimaryColor,
-                                    fontSize = 12.sp,
+                                    text = subject.category.uppercase(),
+                                    color = OnSurfaceVariant.copy(alpha = 0.6f),
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
                                 )
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(0.9f)
-                                    .height(6.dp)
-                                    .clip(CircleShape)
-                                    .background(SurfaceContainer)
-                            ) {
+                                Text(
+                                    text = subject.title,
+                                    color = PrimaryColor,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Horizontal progress slider
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Progress: ",
+                                        color = OnSurfaceVariant,
+                                        fontSize = 12.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "${subject.progress}%",
+                                        color = PrimaryColor,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxWidth(fraction = subject.progress / 100f)
-                                        .fillMaxHeight()
+                                        .fillMaxWidth(0.9f)
+                                        .height(6.dp)
                                         .clip(CircleShape)
-                                        .background(PrimaryColor)
+                                        .background(SurfaceContainer)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(fraction = subject.progress / 100f)
+                                            .fillMaxHeight()
+                                            .clip(CircleShape)
+                                            .background(PrimaryColor)
+                                    )
+                                }
+                            }
+
+                            // Subject Badge icon container
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(PrimaryColor.copy(alpha = 0.05f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = when (subject.iconName) {
+                                        "translate" -> Icons.Outlined.Translate
+                                        "edit_note" -> Icons.Outlined.EditNote
+                                        "star" -> Icons.Outlined.Star
+                                        "public" -> Icons.Outlined.Public
+                                        else -> Icons.Outlined.Calculate
+                                    },
+                                    contentDescription = null,
+                                    tint = PrimaryColor,
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         }
+                    }
+                }
+            }
 
-                        // Subject Badge icon container
+            // Science Lab Coming Soon Placeholder block
+            item {
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = BackgroundColor),
+                    border = BorderStroke(2.dp, PrimaryColor.copy(alpha = 0.15f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Box(
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(54.dp)
                                 .clip(CircleShape)
-                                .background(PrimaryColor.copy(alpha = 0.05f)),
+                                .background(SurfaceContainer),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = when (subject.iconName) {
-                                    "translate" -> Icons.Outlined.Translate
-                                    "edit_note" -> Icons.Outlined.EditNote
-                                    "star" -> Icons.Outlined.Star
-                                    "public" -> Icons.Outlined.Public
-                                    else -> Icons.Outlined.Calculate
-                                },
+                                imageVector = Icons.Default.Science,
                                 contentDescription = null,
-                                tint = PrimaryColor,
-                                modifier = Modifier.size(24.dp)
+                                tint = PrimaryColor.copy(alpha = 0.7f),
+                                modifier = Modifier.size(28.dp)
                             )
                         }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Science Lab",
+                            color = PrimaryColor,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Coming Next Month",
+                            color = OnSurfaceVariant,
+                            fontSize = 12.sp
+                        )
                     }
                 }
             }
         }
 
-        // Science Lab Coming Soon Placeholder block
-        item {
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = BackgroundColor),
-                border = BorderStroke(2.dp, PrimaryColor.copy(alpha = 0.15f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp)
-                    .clip(RoundedCornerShape(24.dp))
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(54.dp)
-                            .clip(CircleShape)
-                            .background(SurfaceContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Science,
-                            contentDescription = null,
-                            tint = PrimaryColor.copy(alpha = 0.7f),
-                            modifier = Modifier.size(28.dp)
-                        )
+        // 2. Custom scrollbar indicator overlay on the right-hand edge
+        LessonsCustomScrollbar(listState = listState)
+
+        // 7. Temporary Floating Action Buttons: Scroll To Top & Scroll To Bottom
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Scroll To Top button
+            FloatingActionButton(
+                onClick = {
+                    coroutineScope.launch {
+                        listState.animateScrollToItem(0)
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "Science Lab",
-                        color = PrimaryColor,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Coming Next Month",
-                        color = OnSurfaceVariant,
-                        fontSize = 12.sp
-                    )
-                }
+                },
+                containerColor = PrimaryColor,
+                contentColor = Color.White,
+                modifier = Modifier
+                    .size(44.dp)
+                    .testTag("lessons_scroll_to_top_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowUpward,
+                    contentDescription = "Scroll to Top",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Scroll To Bottom button
+            FloatingActionButton(
+                onClick = {
+                    coroutineScope.launch {
+                        val total = listState.layoutInfo.totalItemsCount
+                        if (total > 0) {
+                            listState.animateScrollToItem(total - 1)
+                        }
+                    }
+                },
+                containerColor = PrimaryColor,
+                contentColor = Color.White,
+                modifier = Modifier
+                    .size(44.dp)
+                    .testTag("lessons_scroll_to_bottom_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowDownward,
+                    contentDescription = "Scroll to Bottom",
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }
@@ -2532,6 +2752,55 @@ fun ProfileTabScreen(viewModel: MainViewModel) {
                                 )
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // Firebase System Diagnostics Card
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceContainerLow),
+                border = BorderStroke(1.dp, OutlineVariant),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .clickable { viewModel.navigateTo(Screen.FirebaseDebug) }
+                    .testTag("firebase_debug_launcher_btn")
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(PrimaryColor.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Dns,
+                            contentDescription = "Firebase Debug Icon",
+                            tint = PrimaryColor
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "Firebase System Diagnostics",
+                            color = PrimaryColor,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Verify live connection, collections & print to device logs",
+                            color = OnSurfaceVariant,
+                            fontSize = 11.sp
+                        )
                     }
                 }
             }
@@ -4017,13 +4286,18 @@ fun AuthScreen(viewModel: MainViewModel) {
                                     value = name,
                                     onValueChange = { name = it },
                                     modifier = Modifier.fillMaxWidth().testTag("auth_name_input"),
-                                    placeholder = { Text("e.g. Ali Hashim") },
+                                    placeholder = { Text("e.g. Ali Hashim", color = OnSurfaceVariant.copy(alpha = 0.6f)) },
                                     leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = PrimaryColor) },
                                     shape = RoundedCornerShape(12.dp),
                                     singleLine = true,
                                     colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = OnBackground,
+                                        unfocusedTextColor = OnBackground,
+                                        focusedContainerColor = Color.White,
+                                        unfocusedContainerColor = Color.White,
                                         focusedBorderColor = PrimaryColor,
-                                        unfocusedBorderColor = OutlineVariant
+                                        unfocusedBorderColor = OutlineVariant,
+                                        cursorColor = PrimaryColor
                                     )
                                 )
                             }
@@ -4040,13 +4314,18 @@ fun AuthScreen(viewModel: MainViewModel) {
                                     value = villageName,
                                     onValueChange = { villageName = it },
                                     modifier = Modifier.fillMaxWidth().testTag("auth_village_input"),
-                                    placeholder = { Text("e.g. Sahiwal Village") },
+                                    placeholder = { Text("e.g. Sahiwal Village", color = OnSurfaceVariant.copy(alpha = 0.6f)) },
                                     leadingIcon = { Icon(Icons.Default.Place, contentDescription = null, tint = PrimaryColor) },
                                     shape = RoundedCornerShape(12.dp),
                                     singleLine = true,
                                     colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = OnBackground,
+                                        unfocusedTextColor = OnBackground,
+                                        focusedContainerColor = Color.White,
+                                        unfocusedContainerColor = Color.White,
                                         focusedBorderColor = PrimaryColor,
-                                        unfocusedBorderColor = OutlineVariant
+                                        unfocusedBorderColor = OutlineVariant,
+                                        cursorColor = PrimaryColor
                                     )
                                 )
                             }
@@ -4064,13 +4343,18 @@ fun AuthScreen(viewModel: MainViewModel) {
                                 value = emailOrPhone,
                                 onValueChange = { emailOrPhone = it },
                                 modifier = Modifier.fillMaxWidth().testTag("auth_email_phone_input"),
-                                placeholder = { Text("e.g. 03211234567 or student@email.com") },
+                                placeholder = { Text("e.g. 03211234567 or student@email.com", color = OnSurfaceVariant.copy(alpha = 0.6f)) },
                                 leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = PrimaryColor) },
                                 shape = RoundedCornerShape(12.dp),
                                 singleLine = true,
                                 colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = OnBackground,
+                                    unfocusedTextColor = OnBackground,
+                                    focusedContainerColor = Color.White,
+                                    unfocusedContainerColor = Color.White,
                                     focusedBorderColor = PrimaryColor,
-                                    unfocusedBorderColor = OutlineVariant
+                                    unfocusedBorderColor = OutlineVariant,
+                                    cursorColor = PrimaryColor
                                 )
                             )
                         }
@@ -4123,13 +4407,18 @@ fun AuthScreen(viewModel: MainViewModel) {
                                 value = password,
                                 onValueChange = { password = it },
                                 modifier = Modifier.fillMaxWidth().testTag("auth_password_input"),
-                                placeholder = { Text("•••••• (Choose a security password)") },
+                                placeholder = { Text("•••••• (Choose a security password)", color = OnSurfaceVariant.copy(alpha = 0.6f)) },
                                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = PrimaryColor) },
                                 shape = RoundedCornerShape(12.dp),
                                 singleLine = true,
                                 colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = OnBackground,
+                                    unfocusedTextColor = OnBackground,
+                                    focusedContainerColor = Color.White,
+                                    unfocusedContainerColor = Color.White,
                                     focusedBorderColor = PrimaryColor,
-                                    unfocusedBorderColor = OutlineVariant
+                                    unfocusedBorderColor = OutlineVariant,
+                                    cursorColor = PrimaryColor
                                 )
                             )
                         }
@@ -4630,6 +4919,347 @@ fun SimpleMarkdownViewer(markdownText: String) {
                 }
                 else -> {
                     Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// 13. FIREBASE & FIRESTORE DEBUG DIAGNOSTICS SCREEN
+// ==========================================
+@Composable
+fun FirebaseDebugScreen(viewModel: MainViewModel) {
+    val coroutineScope = rememberCoroutineScope()
+    val profile by viewModel.profile.collectAsState()
+    
+    // Debug variables status states
+    var isCheckingConnection by remember { mutableStateOf(false) }
+    var isTestingWrite by remember { mutableStateOf(false) }
+    var writeStatus by remember { mutableStateOf<String?>(null) }
+    var writeSuccess by remember { mutableStateOf<Boolean?>(null) }
+    var printedLogsInfo by remember { mutableStateOf("") }
+    
+    val projectId = remember {
+        try {
+            com.google.firebase.FirebaseApp.getInstance().options.projectId ?: "Unknown"
+        } catch (e: Exception) {
+            "Not initialized"
+        }
+    }
+    
+    val currentUserId = profile?.studentName ?: "Ali Hashim"
+    val currentUserEmail = profile?.emailOrPhone ?: "alihashim7227@gmail.com"
+    
+    val collectionsUsed = listOf(
+        "subjects",
+        "chapters",
+        "notes",
+        "quiz_attempts",
+        "student_progress",
+        "test_writes"
+    )
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { viewModel.navigateTo(Screen.MainApp) },
+                    modifier = Modifier.testTag("back_to_profile_from_debug_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back to Profile",
+                        tint = PrimaryColor
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Firebase Diagnostics",
+                    color = PrimaryColor,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+        }
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(BackgroundColor)
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(bottom = 40.dp)
+        ) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, OutlineVariant),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "🛰️ PROJECT METADATA",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SecondaryColor
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        Row(modifier = Modifier.padding(vertical = 4.dp)) {
+                            Text(text = "Project ID: ", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PrimaryColor)
+                            Text(text = projectId, fontSize = 13.sp, color = OnSurfaceVariant)
+                        }
+                        Row(modifier = Modifier.padding(vertical = 4.dp)) {
+                            Text(text = "Logged-In User: ", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PrimaryColor)
+                            Text(text = "$currentUserId ($currentUserEmail)", fontSize = 13.sp, color = OnSurfaceVariant)
+                        }
+                        Row(modifier = Modifier.padding(vertical = 4.dp)) {
+                            Text(text = "Package Name: ", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PrimaryColor)
+                            Text(text = "com.example", fontSize = 13.sp, color = OnSurfaceVariant)
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, OutlineVariant),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "📁 FIRESTORE COLLECTIONS IN USE",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SecondaryColor
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        collectionsUsed.forEach { collectionName ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "• $collectionName", 
+                                    fontSize = 13.sp, 
+                                    color = PrimaryColor, 
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = if (collectionName == "test_writes") "Diagnostic" else "Production",
+                                    fontSize = 11.sp,
+                                    color = if (collectionName == "test_writes") GoldDark else SecondaryColor,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, OutlineVariant),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "⚡ AD-HOC DIAGNOSTIC COMMANDS",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SecondaryColor
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Command 1: Initialize connection, print logs to Logcat
+                        Button(
+                            onClick = {
+                                isCheckingConnection = true
+                                try {
+                                    val app = com.google.firebase.FirebaseApp.getInstance()
+                                    val pId = app.options.projectId
+                                    val aName = app.name
+                                    val pkg = "com.example"
+                                    
+                                    android.util.Log.d("FirebaseVerify", ">>>> DIAGNOSTIC LOG TRIGGERED <<<<")
+                                    android.util.Log.d("FirebaseVerify", "Firebase Project ID: $pId")
+                                    android.util.Log.d("FirebaseVerify", "Firebase App Name: $aName")
+                                    android.util.Log.d("FirebaseVerify", "Package Name: $pkg")
+                                    android.util.Log.d("FirebaseVerify", ">>>> END OF DIAGNOSTIC LOG <<<<")
+                                    
+                                    printedLogsInfo = "Logcat entries published successfully with tag 'FirebaseVerify'!"
+                                } catch (e: Exception) {
+                                    printedLogsInfo = "Failed: ${e.message}"
+                                }
+                                isCheckingConnection = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryColor),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .testTag("firebase_print_logs_btn")
+                        ) {
+                            Text(text = "Verify Connection & Print to Logs", fontWeight = FontWeight.Bold)
+                        }
+
+                        if (printedLogsInfo.isNotEmpty()) {
+                            Text(
+                                text = printedLogsInfo,
+                                fontSize = 12.sp,
+                                color = SecondaryColor,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Command 2: Write direct test document to "test_writes"
+                        Button(
+                            onClick = {
+                                isTestingWrite = true
+                                writeStatus = "Sending write request to Firestore collection 'test_writes'..."
+                                writeSuccess = null
+                                
+                                try {
+                                    val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                    val timestamp = System.currentTimeMillis()
+                                    val testDocName = "verify_$timestamp"
+                                    
+                                    val docData = hashMapOf(
+                                        "testerName" to currentUserId,
+                                        "testerEmail" to currentUserEmail,
+                                        "testTime" to timestamp,
+                                        "package" to "com.example",
+                                        "projectId" to projectId,
+                                        "offlineCapabilityVerification" to true
+                                    )
+                                    
+                                    db.collection("test_writes")
+                                        .document(testDocName)
+                                        .set(docData)
+                                        .addOnSuccessListener {
+                                            writeStatus = "Firestore data write successful!\nCollection: 'test_writes'\nDocument ID: '$testDocName'"
+                                            writeSuccess = true
+                                            isTestingWrite = false
+                                        }
+                                        .addOnFailureListener { err ->
+                                            writeStatus = "Firestore write failed: ${err.message}"
+                                            writeSuccess = false
+                                            isTestingWrite = false
+                                        }
+                                } catch (e: Exception) {
+                                    writeStatus = "SDK Initialization/Connection Error: ${e.message}"
+                                    writeSuccess = false
+                                    isTestingWrite = false
+                                }
+                            },
+                            enabled = !isTestingWrite,
+                            colors = ButtonDefaults.buttonColors(containerColor = SecondaryColor),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .testTag("firestore_test_write_btn")
+                        ) {
+                            if (isTestingWrite) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp))
+                            } else {
+                                Text(text = "Test Firestore Write Sync", fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        writeStatus?.let { statusMsg ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Card(
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (writeSuccess == true) SecondaryContainer.copy(alpha = 0.2f)
+                                                    else if (writeSuccess == false) Color.Red.copy(alpha = 0.05f)
+                                                    else SurfaceContainer
+                                ),
+                                border = BorderStroke(
+                                    width = 1.dp,
+                                    color = if (writeSuccess == true) SecondaryColor
+                                            else if (writeSuccess == false) Color.Red
+                                            else OutlineVariant
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = if (writeSuccess == true) "✅ WRITE VERIFIED"
+                                               else if (writeSuccess == false) "❌ WRITE ERROR"
+                                               else "⏳ SENT",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 11.sp,
+                                        color = if (writeSuccess == true) SecondaryColor
+                                                else if (writeSuccess == false) Color.Red
+                                                else PrimaryColor
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = statusMsg,
+                                        fontSize = 12.sp,
+                                        color = PrimaryColor,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceContainerLow),
+                    border = BorderStroke(1.dp, OutlineVariant),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "💡 HOW TO VERIFY IN FIREBASE CONSOLE",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryColor
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "1. Sign in to your Firebase Console (https://console.firebase.google.com)\n" +
+                                   "2. Locate project '$projectId'\n" +
+                                   "3. Go to Firestore Database under Build section\n" +
+                                   "4. Look for collection 'test_writes' to find the verification document created above.",
+                            fontSize = 11.sp,
+                            color = OnSurfaceVariant,
+                            lineHeight = 16.sp
+                        )
+                    }
                 }
             }
         }

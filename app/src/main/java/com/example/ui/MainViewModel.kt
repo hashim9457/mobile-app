@@ -12,6 +12,7 @@ sealed class Screen {
     object Onboarding : Screen()
     object Auth : Screen()
     object MainApp : Screen()
+    object FirebaseDebug : Screen()
     data class SubjectDetail(val subjectId: String) : Screen()
     data class Quiz(val subjectId: String) : Screen()
     data class QuizResult(val score: Int, val total: Int, val timeMinutes: Int, val timeSeconds: Int) : Screen()
